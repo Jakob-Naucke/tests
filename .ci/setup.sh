@@ -46,16 +46,19 @@ setup_distro_env() {
 	sudo systemctl start haveged
 }
 
-install_docker() {
+install_container_engine() {
 	if [ "${TEST_CGROUPSV2}" == "true" ]; then
 		info "Docker won't be installed: testing cgroups V2"
 		return
 	fi
 
-	if ([ "$arch" == "ppc64le" ] || [ "$arch" == "s390x" ]) && ([ "$ID" == "fedora" ] || [[ "${ID_LIKE:-}" =~ "fedora" ]]); then
-		# download.docker.com does not package for ppc64le and s390x and on
-		# Fedora-likes, it's not packaged by the distro either. Use Podman.
-		sudo dnf install -y podman runc
+	if [ "$ID" == "fedora" ] || [[ "${ID_LIKE:-}" =~ "fedora" ]]; then
+		# Podman is the primary container engine on Fedora-likes
+		# Try reinstalling to fix CNI configuration
+		sudo dnf reinstall -y podman || sudo dnf install -y podman
+		# runc is not always a dependency, but required for the tests
+		# When it is a dependency, explicitly installing it leads to version conflicts, so use --nobest
+		sudo dnf install -y --nobest runc
 		export USE_PODMAN=1
 		return
 	fi
@@ -157,7 +160,7 @@ main() {
 		export CC=gcc
 	fi
 
-	install_docker
+	install_container_engine
 	enable_nested_virtualization
 	install_kata
 	install_extra_tools
